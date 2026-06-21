@@ -10,6 +10,7 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
+from app.core.auth import get_current_user
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -22,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 ARTICLE_CHAT_SYSTEM_PROMPT = """You are a helpful AI assistant analyzing a specific tech news article.
 You are chatting with a user who is reading the article right now.
@@ -143,3 +144,4 @@ async def article_chat(
         media_type="text/event-stream",
         headers=headers,
     )
+

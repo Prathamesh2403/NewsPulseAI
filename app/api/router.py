@@ -6,7 +6,7 @@ Aggregates all endpoint routers under the ``/api/v1/`` prefix.
 
 from fastapi import APIRouter
 
-from app.api.endpoints import articles, chat, digest, health, sources, trends, article_chat, admin
+from app.api.endpoints import articles, chat, digest, health, sources, trends, article_chat, admin, auth
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -18,3 +18,4 @@ api_router.include_router(trends.router, tags=["trends"])
 api_router.include_router(sources.router, tags=["sources"])
 api_router.include_router(articles.router, tags=["articles"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+api_router.include_router(auth.router, prefix="/auth", tags=["auth"])

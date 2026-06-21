@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useArticles, useFeaturedArticles } from '../hooks/useArticles'
 import FilterChips from '../components/feed/FilterChips'
 import NewsCard from '../components/feed/NewsCard'
-import SentimentBadge from '../components/feed/SentimentBadge'
 import { relativeTime, categoryGradient } from '../utils/feedUtils'
 
 /* ── Hero skeleton ──────────────────────────────────────────────────── */
@@ -86,7 +85,6 @@ function HeroSection({ article }) {
           <span className="hero-source">{article.source_name || article.source}</span>
           <span className="hero-dot">&middot;</span>
           <span>{relativeTime(article.published_at)}</span>
-          <SentimentBadge sentiment={article.sentiment_label || 'neutral'} />
         </div>
       </div>
     </div>

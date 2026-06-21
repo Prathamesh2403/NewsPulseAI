@@ -7,6 +7,8 @@
  */
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 
+import { getAuthHeaders, removeToken } from '../utils/auth'
+
 export function sendChatMessage(query, chatHistory = [], { onChunk, onCitations, onDone, onError }) {
   const controller = new AbortController()
   let doneFired = false
@@ -21,12 +23,20 @@ export function sendChatMessage(query, chatHistory = [], { onChunk, onCitations,
     try {
       const res = await fetch(`${API_BASE}/api/v1/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
         body: JSON.stringify({ query, chat_history: chatHistory }),
         signal: controller.signal,
       })
 
       if (!res.ok) {
+        if (res.status === 401) {
+          removeToken()
+          window.location.href = '/login'
+          return
+        }
         const text = await res.text().catch(() => 'Unknown error')
         onError?.(`Server error (${res.status}): ${text}`)
         return

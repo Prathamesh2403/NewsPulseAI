@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getAuthHeaders, removeToken } from '../utils/auth'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 
@@ -22,9 +23,17 @@ export function useArticles(category = null, page = 1) {
       params.append('category', category)
     }
 
-    fetch(`${API_BASE}/api/v1/articles?${params}`)
+    fetch(`${API_BASE}/api/v1/articles?${params}`, {
+      headers: { ...getAuthHeaders() }
+    })
       .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        if (!r.ok) {
+          if (r.status === 401) {
+            removeToken();
+            window.location.href = '/login';
+          }
+          throw new Error(`HTTP ${r.status}`)
+        }
         return r.json()
       })
       .then(data => {
@@ -52,9 +61,17 @@ export function useFeaturedArticles() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/v1/articles/featured`)
+    fetch(`${API_BASE}/api/v1/articles/featured`, {
+      headers: { ...getAuthHeaders() }
+    })
       .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        if (!r.ok) {
+          if (r.status === 401) {
+            removeToken();
+            window.location.href = '/login';
+          }
+          throw new Error(`HTTP ${r.status}`)
+        }
         return r.json()
       })
       .then(data => {

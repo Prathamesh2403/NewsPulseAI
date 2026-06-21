@@ -7,6 +7,7 @@ import math
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from app.core.auth import get_current_user
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +21,7 @@ from app.schemas.article import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 @router.get("/articles", response_model=ArticleListResponse)
@@ -169,3 +170,4 @@ async def get_article_detail(
         image_url=article.image_url,
         image_url_original=article.image_url_original,
     )
+

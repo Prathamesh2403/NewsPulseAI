@@ -9,6 +9,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from app.core.auth import get_current_user
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +24,7 @@ from app.schemas.trends import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 # Map timeframe shorthand to number of days
 _TIMEFRAME_MAP: dict[str, int] = {
@@ -114,3 +115,4 @@ async def get_trends(
         timeframe=timeframe_label,
     )
     return TrendsResponse(data=trend_data)
+

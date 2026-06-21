@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { getAuthHeaders, removeToken } from '../../utils/auth'
 
 /* ── Source color palette (deterministic by source name) ──────────── */
 const SOURCE_COLORS = [
@@ -36,8 +37,14 @@ export default function CitationCard({ citation }) {
     if (citation.id && !citation.id.toString().startsWith("tavily_")) {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/api/v1/articles/${citation.id}`
+          `${import.meta.env.VITE_API_BASE_URL}/api/v1/articles/${citation.id}`,
+          { headers: { ...getAuthHeaders() } }
         )
+        if (res.status === 401) {
+          removeToken()
+          window.location.href = '/login'
+          return
+        }
         if (res.status === 404) {
           setCitationError(citation.id)
           return

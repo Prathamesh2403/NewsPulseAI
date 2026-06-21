@@ -9,6 +9,7 @@ import logging
 from datetime import date, datetime, time, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from app.core.auth import get_current_user
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +19,7 @@ from app.schemas.trends import DigestItem, DigestResponse
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 @router.get("/digest", response_model=DigestResponse)
@@ -73,3 +74,4 @@ async def get_digest(
         category=category,
         date=date,
     )
+

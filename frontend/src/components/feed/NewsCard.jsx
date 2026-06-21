@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { categoryGradient } from '../../utils/feedUtils'
-import SentimentBadge from './SentimentBadge'
 import { relativeTime } from '../../utils/feedUtils'
 
 /**
@@ -66,11 +65,6 @@ export default function NewsCard({ article }) {
         {article.summary && (
           <p className="news-card__snippet">{article.summary}</p>
         )}
-
-        {/* Sentiment */}
-        <div className="news-card__footer">
-          <SentimentBadge sentiment={article.sentiment_label || 'neutral'} />
-        </div>
       </div>
     </article>
   )

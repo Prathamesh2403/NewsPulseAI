@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
 
+    # --- Authentication ---
+    admin_username: str = ""
+    admin_password_hash: str = ""
+    jwt_secret_key: str = ""
+    jwt_algorithm: str = "HS256"
+    jwt_expiry_hours: int = 24
+
     # --- LLM (Gemini) — primary provider ---
     gemini_api_key: str = ""
     gemini_api_keys: str = ""  # Comma-separated list

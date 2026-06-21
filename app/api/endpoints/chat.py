@@ -13,14 +13,15 @@ This ensures exactly ONE stream writes to the response.
 import json
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends
+from app.core.auth import get_current_user, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.schemas.chat import ChatRequest, ChatResponse
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 @router.post("/chat")
@@ -180,3 +181,4 @@ async def chat_sync(request: ChatRequest) -> ChatResponse:
     except Exception as exc:
         logger.exception("Chat sync error")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+

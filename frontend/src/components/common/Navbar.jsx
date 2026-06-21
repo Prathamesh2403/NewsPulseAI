@@ -1,10 +1,5 @@
-import { NavLink } from 'react-router-dom'
-
-/* ── Static placeholder user (no auth) ─────────────────────────────── */
-const user = {
-  name: 'John D.',
-  avatar: null,
-}
+import { NavLink, useNavigate } from 'react-router-dom'
+import { getUser, removeToken } from '../../utils/auth'
 
 /* ── Nav tabs config ───────────────────────────────────────────────── */
 const navTabs = [
@@ -58,6 +53,14 @@ function ChevronDownIcon() {
 
 /* ── Navbar ─────────────────────────────────────────────────────────── */
 export default function Navbar() {
+  const navigate = useNavigate();
+  const user = getUser() || { name: 'Admin' };
+
+  const handleLogout = () => {
+    removeToken();
+    navigate('/login');
+  };
+
   return (
     <nav className="navbar-dark">
       <div className="navbar-inner">
@@ -99,13 +102,23 @@ export default function Navbar() {
 
           <div className="navbar-divider" />
 
-          <button className="navbar-user-btn">
-            <div className="navbar-avatar">
-              {user.name.split(' ').map(n => n[0]).join('')}
+          <div className="relative group">
+            <button className="navbar-user-btn">
+              <div className="navbar-avatar">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <span className="navbar-username">{user.name}</span>
+              <ChevronDownIcon />
+            </button>
+            <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1 z-10 hidden group-hover:block border border-gray-700">
+              <button 
+                onClick={handleLogout}
+                className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700"
+              >
+                Logout
+              </button>
             </div>
-            <span className="navbar-username">{user.name}</span>
-            <ChevronDownIcon />
-          </button>
+          </div>
         </div>
       </div>
     </nav>

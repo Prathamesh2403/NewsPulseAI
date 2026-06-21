@@ -1,9 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.core.auth import get_current_user
 from sqlalchemy import select
 from app.db.session import SyncSessionLocal
 from app.db.models import IngestionRun
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 @router.get("/ingestion/status")
 async def get_ingestion_status():
@@ -30,3 +31,4 @@ async def trigger_ingestion():
     from app.scheduler.tasks import run_ingestion_pipeline
     task = run_ingestion_pipeline.delay()
     return {"task_id": task.id, "status": "triggered"}
+
