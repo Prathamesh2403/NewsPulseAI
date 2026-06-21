@@ -6,6 +6,7 @@ Docs: https://newsapi.ai/documentation
 """
 
 import asyncio
+import random
 from datetime import datetime, timezone
 from typing import Any
 
@@ -33,7 +34,7 @@ _KEYWORDS = [
     "AI regulation",
 ]
 
-_ARTICLES_PER_KEYWORD = 20
+_MAX_ARTICLES = 25
 _RATE_LIMIT_SLEEP = 1.0
 
 
@@ -117,49 +118,49 @@ class NewsAPIIngester(BaseIngester):
         seen_urls: set[str] = set()
 
         async with httpx.AsyncClient(timeout=30.0) as client:
-            for keyword in _KEYWORDS:
-                await asyncio.sleep(_RATE_LIMIT_SLEEP)
+            # Pick a single random keyword per run to conserve tokens (1 API call per run)
+            keyword = random.choice(_KEYWORDS)
+            
+            payload = {
+                "action": "getArticles",
+                "keyword": keyword,
+                "sourceLocationUri": "http://en.wikipedia.org/wiki/United_States",
+                "ignoreSourceGroupUri": "paywall/paywalled_sources",
+                "articlesPage": 1,
+                "articlesCount": _MAX_ARTICLES,
+                "articlesSortBy": "date",
+                "resultType": "articles",
+                "dataType": ["news"],
+                "apiKey": api_key,
+            }
 
-                payload = {
-                    "action": "getArticles",
-                    "keyword": keyword,
-                    "sourceLocationUri": "http://en.wikipedia.org/wiki/United_States",
-                    "ignoreSourceGroupUri": "paywall/paywalled_sources",
-                    "articlesPage": 1,
-                    "articlesCount": _ARTICLES_PER_KEYWORD,
-                    "articlesSortBy": "date",
-                    "resultType": "articles",
-                    "dataType": ["news"],
-                    "apiKey": api_key,
-                }
+            try:
+                resp = await client.post(_BASE_URL, json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+            except httpx.HTTPStatusError as exc:
+                logger.warning("NewsAPI.ai HTTP error keyword='%s': %s", keyword, exc)
+                return articles
+            except Exception as exc:
+                logger.warning("NewsAPI.ai request error: %s", exc)
+                return articles
 
-                try:
-                    resp = await client.post(_BASE_URL, json=payload)
-                    resp.raise_for_status()
-                    data = resp.json()
-                except httpx.HTTPStatusError as exc:
-                    logger.warning("NewsAPI.ai HTTP error keyword='%s': %s", keyword, exc)
+            results = (data.get("articles") or {}).get("results") or []
+
+            for item in results:
+                # Skip duplicates flagged by EventRegistry
+                if item.get("isDuplicate", False):
                     continue
-                except Exception as exc:
-                    logger.warning("NewsAPI.ai request error: %s", exc)
-                    continue
 
-                results = (data.get("articles") or {}).get("results") or []
+                article = _normalize(item, keyword)
+                if article and article.url not in seen_urls:
+                    seen_urls.add(article.url)
+                    articles.append(article)
 
-                for item in results:
-                    # Skip duplicates flagged by EventRegistry
-                    if item.get("isDuplicate", False):
-                        continue
-
-                    article = _normalize(item, keyword)
-                    if article and article.url not in seen_urls:
-                        seen_urls.add(article.url)
-                        articles.append(article)
-
-                logger.debug(
-                    "NewsAPI.ai keyword='%s' → %d results, %d valid",
-                    keyword, len(results), len([a for a in [_normalize(i, keyword) for i in results] if a]),
-                )
+            logger.debug(
+                "NewsAPI.ai keyword='%s' → %d results, %d valid",
+                keyword, len(results), len([a for a in [_normalize(i, keyword) for i in results] if a]),
+            )
 
         logger.info("NewsAPI.ai ingestion complete — %d articles", len(articles))
         return articles
