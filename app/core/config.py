@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
 
+    # --- Deployment ---
+    environment: str = "development"  # "development" | "production"
+    frontend_url: str = "http://localhost:5173"  # Vercel URL in production
+
     # --- Authentication ---
     admin_username: str = ""
     admin_password_hash: str = ""
@@ -77,7 +81,18 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     # --- ChromaDB ---
+    # In development: ./data/chroma_db (local)
+    # In production: /app/data/vector_db (Railway volume mount)
     chroma_persist_dir: str = "./data/chroma_db"
+    chromadb_path: str = "./data/chroma_db"  # Alias for Railway env var
+
+    @property
+    def resolved_chroma_path(self) -> str:
+        """Return chromadb_path if explicitly set, else fall back to chroma_persist_dir."""
+        # If CHROMADB_PATH env var is set, it takes priority
+        if self.chromadb_path != "./data/chroma_db":
+            return self.chromadb_path
+        return self.chroma_persist_dir
 
     # --- Ingestion ---
     ingestion_interval_hours: int = 3

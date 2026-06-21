@@ -21,14 +21,14 @@ class VectorStore:
 
     def __init__(self) -> None:
         settings = get_settings()
-        self._client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
+        self._client = chromadb.PersistentClient(path=settings.resolved_chroma_path)
         self._collection = self._client.get_or_create_collection(
             name="articles",
             metadata={"hnsw:space": "cosine"},
         )
         logger.info(
             "ChromaDB initialized at %s (collection count: %d)",
-            settings.chroma_persist_dir,
+            settings.resolved_chroma_path,
             self._collection.count(),
         )
 
@@ -87,7 +87,7 @@ class CommunityVectorStore:
 
     def __init__(self) -> None:
         settings = get_settings()
-        self._client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
+        self._client = chromadb.PersistentClient(path=settings.resolved_chroma_path)
         self._collection = self._client.get_or_create_collection(
             name="community_comments",
             metadata={"hnsw:space": "cosine"},

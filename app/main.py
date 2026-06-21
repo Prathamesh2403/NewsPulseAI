@@ -80,10 +80,14 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS middleware
+    # CORS middleware — include Vercel frontend URL from env
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins_list,
+        allow_origins=[
+            "http://localhost:5173",
+            "http://localhost:3000",
+            settings.frontend_url,        # Vercel URL in production
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -91,6 +95,11 @@ def create_app() -> FastAPI:
 
     # Mount all API routes
     app.include_router(api_router)
+
+    # Root health check (used by Railway healthcheckPath)
+    @app.get("/", tags=["health"])
+    def root():
+        return {"status": "ok", "service": "NewsPulse AI API"}
 
     return app
 

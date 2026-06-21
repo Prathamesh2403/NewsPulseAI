@@ -34,6 +34,10 @@ celery_app.conf.update(
     task_acks_late=True,
     # Don't prefetch more than 1 task per worker process
     worker_prefetch_multiplier=1,
+    # Persist beat schedule in Redis (survives container restarts/redeploys)
+    beat_scheduler="redbeat.RedBeatScheduler",
+    redbeat_redis_url=_broker_url,
+    redbeat_key_prefix="newspulse:beat:",
 )
 
 # Register beat schedule
