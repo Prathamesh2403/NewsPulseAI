@@ -46,7 +46,7 @@ rapidfuzz>=3.0.0
 # Task Scheduling
 celery[redis]>=5.4.0
 redis>=5.0.0
-redbeat>=2.2.0
+celery-redbeat>=2.2.0
 
 # Utilities
 python-dateutil>=2.9.0
