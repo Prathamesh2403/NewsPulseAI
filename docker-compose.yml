@@ -34,8 +34,8 @@ services:
       - .env
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - DATABASE_URL=postgresql+asyncpg://postgres:pratham24@host.docker.internal:5432/newsbot
-      - DATABASE_URL_SYNC=postgresql+psycopg2://postgres:pratham24@host.docker.internal:5432/newsbot
+      - DATABASE_URL=postgresql+asyncpg://postgres.zpqgxhthkkmfkildqcgw:prathameshK%402@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres
+      - DATABASE_URL_SYNC=postgresql+psycopg2://postgres.zpqgxhthkkmfkildqcgw:prathameshK%402@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres
     volumes:
       - ./app:/app/app          # live reload in dev
       - ./data:/app/data        # ChromaDB persistence in dev
@@ -52,8 +52,8 @@ services:
       - .env
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - DATABASE_URL=postgresql+asyncpg://postgres:pratham24@host.docker.internal:5432/newsbot
-      - DATABASE_URL_SYNC=postgresql+psycopg2://postgres:pratham24@host.docker.internal:5432/newsbot
+      - DATABASE_URL=postgresql+asyncpg://postgres.zpqgxhthkkmfkildqcgw:prathameshK%402@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres
+      - DATABASE_URL_SYNC=postgresql+psycopg2://postgres.zpqgxhthkkmfkildqcgw:prathameshK%402@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres
     volumes:
       - ./data:/app/data
     depends_on:

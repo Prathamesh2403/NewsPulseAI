@@ -23,8 +23,10 @@ from app.db.models import Article, IngestionRun  # noqa: F401 — registers mode
 config = context.config
 
 # Override sqlalchemy.url from our settings
+# Note: configparser uses % for interpolation, so we must escape % as %%
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database_url_sync)
+escaped_url = settings.database_url_sync.replace("%", "%%")
+config.set_main_option("sqlalchemy.url", escaped_url)
 
 # Interpret the config file for Python logging
 if config.config_file_name is not None:
