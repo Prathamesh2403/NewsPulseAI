@@ -28,7 +28,8 @@ _gemini_load_failed: bool = False
 GEMINI_EMBEDDING_MODEL = "gemini-embedding-001"
 GEMINI_EMBEDDING_DIM = 768
 # Gemini embed_content API hard limit: max 100 texts per batch call
-GEMINI_BATCH_SIZE = 100
+# Free tier is limited to 100 requests (texts) per minute.
+GEMINI_BATCH_SIZE = 20
 
 
 def _get_local_model() -> Any:
@@ -167,8 +168,8 @@ def _generate_gemini_embeddings(texts: list[str]) -> list[list[float]]:
     """Generate embeddings via the Gemini API (production, zero RAM cost).
 
     Uses the new google.genai SDK (v1 API) with gemini-embedding-001.
-    Automatically chunks input into batches of GEMINI_BATCH_SIZE (100)
-    because the API rejects requests with more than 100 texts at once.
+    Automatically chunks input into batches of GEMINI_BATCH_SIZE (20)
+    because the API limits free tier to 100 texts per minute.
     """
     client = _get_gemini_client()
 
@@ -178,31 +179,55 @@ def _generate_gemini_embeddings(texts: list[str]) -> list[list[float]]:
 
     try:
         from google.genai import types
+        import time
 
         all_results: list[list[float]] = []
 
         # Split into chunks of at most GEMINI_BATCH_SIZE to respect API limits
         for batch_start in range(0, len(texts), GEMINI_BATCH_SIZE):
+            if batch_start > 0:
+                # Sleep to stay under the 100 requests per minute limit
+                # 20 items * 5 batches = 100 items. Sleep 15s between 20-item batches
+                # ensures we never exceed ~80 items per rolling minute.
+                logger.debug("Sleeping for 15s to respect Gemini rate limits...")
+                time.sleep(15)
+
             batch = texts[batch_start : batch_start + GEMINI_BATCH_SIZE]
-            response = client.models.embed_content(
-                model=GEMINI_EMBEDDING_MODEL,
-                contents=batch,
-                config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
-            )
-            all_results.extend(e.values for e in response.embeddings)
-            logger.debug(
-                "Embedded batch %d-%d (%d items)",
-                batch_start,
-                batch_start + len(batch) - 1,
-                len(batch),
-            )
+            
+            # Simple retry logic for 429 Resource Exhausted
+            retries = 3
+            for attempt in range(retries):
+                try:
+                    response = client.models.embed_content(
+                        model=GEMINI_EMBEDDING_MODEL,
+                        contents=batch,
+                        config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
+                    )
+                    all_results.extend(e.values for e in response.embeddings)
+                    logger.debug(
+                        "Embedded batch %d-%d (%d items)",
+                        batch_start,
+                        batch_start + len(batch) - 1,
+                        len(batch),
+                    )
+                    break # Success, break out of retry loop
+                except Exception as e:
+                    if "429" in str(e) and attempt < retries - 1:
+                        wait_time = 30 * (attempt + 1)
+                        logger.warning("Gemini 429 Rate Limit hit. Retrying in %ds...", wait_time)
+                        time.sleep(wait_time)
+                    else:
+                        raise e
 
         logger.info("Generated %d Gemini embeddings total", len(all_results))
         return all_results
 
     except Exception as exc:
         logger.error("Gemini embedding generation failed: %s", exc)
-        return [[] for _ in texts]
+        # Pad with empty arrays if failed halfway so indices still line up
+        while len(all_results) < len(texts):
+            all_results.append([])
+        return all_results
 
 
 def generate_single_embedding(text: str) -> list[float]:
