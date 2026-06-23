@@ -111,19 +111,25 @@ async def sync_chromadb(background_tasks: BackgroundTasks):
 
 
 async def run_sync_chromadb_directly() -> None:
-    """Background task to sync Postgres articles to ChromaDB."""
+    """Background task to sync Postgres articles to ChromaDB.
+
+    Uses the async session (asyncpg → Supabase) so it works on Render
+    where no local Postgres exists.
+    """
     from app.db.models import Article
     from app.processing.embedder import generate_embeddings, prepare_embedding_text
     from app.db.vector_store import get_vector_store
+    from app.db.session import async_session_factory
+    from sqlalchemy import select as sa_select
 
     start = time.time()
     logger.info("[CHROMA SYNC] Starting ChromaDB backfill from Postgres")
 
     try:
-        # 1. Fetch all articles from PostgreSQL
-        with SyncSessionLocal() as session:
-            stmt = select(Article)
-            articles = session.scalars(stmt).all()
+        # 1. Fetch all articles from PostgreSQL via async session (→ Supabase)
+        async with async_session_factory() as session:
+            result = await session.execute(sa_select(Article))
+            articles = result.scalars().all()
 
         if not articles:
             logger.info("[CHROMA SYNC] No articles found in Postgres.")
