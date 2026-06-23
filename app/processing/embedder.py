@@ -57,7 +57,11 @@ def _get_local_model() -> Any:
 
 
 def _get_gemini_client() -> Any:
-    """Lazy-load the Google Generative AI client (production only)."""
+    """Lazy-load the Google GenAI client (production only).
+
+    Uses the new `google.genai` SDK (v1 API) which supports
+    text-embedding-004 and batched embedContent calls.
+    """
     global _gemini_client, _gemini_load_failed
 
     if _gemini_client is not None:
@@ -66,11 +70,11 @@ def _get_gemini_client() -> Any:
         return None
 
     try:
-        import google.generativeai as genai
+        from google import genai
 
         settings = get_settings()
-        genai.configure(api_key=settings.gemini_api_key)
-        _gemini_client = genai
+        client = genai.Client(api_key=settings.gemini_api_key)
+        _gemini_client = client
         logger.info(
             "Gemini embedding client configured (model: %s)", GEMINI_EMBEDDING_MODEL
         )
@@ -158,24 +162,28 @@ def _generate_local_embeddings(texts: list[str]) -> list[list[float]]:
 
 
 def _generate_gemini_embeddings(texts: list[str]) -> list[list[float]]:
-    """Generate embeddings via the Gemini API (production, zero RAM cost)."""
+    """Generate embeddings via the Gemini API (production, zero RAM cost).
+
+    Uses the new google.genai SDK which:
+    - Targets the v1 API (text-embedding-004 is available there)
+    - Supports batched embed_content calls in a single request
+    """
     client = _get_gemini_client()
 
     if client is None:
         logger.warning("Gemini embedding client not available, returning empty embeddings")
         return [[] for _ in texts]
 
-    results: list[list[float]] = []
     try:
-        # Gemini embed_content handles one text at a time; batch sequentially
-        for text in texts:
-            response = client.embed_content(
-                model=GEMINI_EMBEDDING_MODEL,
-                content=text,
-                task_type="RETRIEVAL_DOCUMENT",
-            )
-            results.append(response["embedding"])
+        from google.genai import types
 
+        # New SDK supports batching all texts in a single API call
+        response = client.models.embed_content(
+            model=GEMINI_EMBEDDING_MODEL,
+            contents=texts,
+            config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
+        )
+        results: list[list[float]] = [e.values for e in response.embeddings]
         logger.debug("Generated %d Gemini embeddings", len(results))
         return results
 
