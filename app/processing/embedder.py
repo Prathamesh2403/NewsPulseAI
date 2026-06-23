@@ -1,11 +1,13 @@
 """
 Embedding generation module.
 
-Uses SentenceTransformers with the all-MiniLM-L6-v2 model to produce
-384-dimensional dense vector embeddings for articles and queries.
+In DEVELOPMENT: Uses SentenceTransformers with all-MiniLM-L6-v2 (384-dim)
+                loaded locally — fast and free.
+In PRODUCTION:  Uses Google Gemini text-embedding-004 API (768-dim) — zero
+                RAM overhead, no model download, works within Render's 512 MB
+                free tier.
 
-The model is lazy-loaded as a module-level singleton to avoid reloading
-on every call.
+The active backend is selected once at startup based on ENVIRONMENT.
 """
 
 import logging
@@ -15,47 +17,76 @@ from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-# Module-level singleton for the embedding model
-_embedding_model: Any = None
-_model_load_failed: bool = False
+# ── Local (development) model singleton ──────────────────────────────────────
+_local_model: Any = None
+_local_load_failed: bool = False
+
+# ── Gemini (production) client singleton ─────────────────────────────────────
+_gemini_client: Any = None
+_gemini_load_failed: bool = False
+
+GEMINI_EMBEDDING_MODEL = "models/text-embedding-004"
+GEMINI_EMBEDDING_DIM = 768
 
 
-def _get_model() -> Any:
-    """Lazy-load the SentenceTransformer embedding model.
+def _get_local_model() -> Any:
+    """Lazy-load the SentenceTransformer model (development only)."""
+    global _local_model, _local_load_failed
 
-    Returns the model instance on success, or None if loading fails.
-    Once loading fails, subsequent calls return None immediately.
-
-    Returns:
-        The SentenceTransformer model instance, or None on failure.
-    """
-    global _embedding_model, _model_load_failed
-
-    if _embedding_model is not None:
-        return _embedding_model
-
-    if _model_load_failed:
+    if _local_model is not None:
+        return _local_model
+    if _local_load_failed:
         return None
 
     try:
         from sentence_transformers import SentenceTransformer
 
         settings = get_settings()
-        _embedding_model = SentenceTransformer(settings.embedding_model)
-        logger.info(
-            "Embedding model '%s' loaded successfully", settings.embedding_model
-        )
-        return _embedding_model
+        _local_model = SentenceTransformer(settings.embedding_model)
+        logger.info("Embedding model '%s' loaded successfully", settings.embedding_model)
+        return _local_model
 
     except Exception as exc:
-        _model_load_failed = True
+        _local_load_failed = True
         logger.error(
-            "Failed to load embedding model: %s. "
+            "Failed to load local embedding model: %s. "
             "Embedding generation will return empty vectors.",
             exc,
         )
         return None
 
+
+def _get_gemini_client() -> Any:
+    """Lazy-load the Google Generative AI client (production only)."""
+    global _gemini_client, _gemini_load_failed
+
+    if _gemini_client is not None:
+        return _gemini_client
+    if _gemini_load_failed:
+        return None
+
+    try:
+        import google.generativeai as genai
+
+        settings = get_settings()
+        genai.configure(api_key=settings.gemini_api_key)
+        _gemini_client = genai
+        logger.info(
+            "Gemini embedding client configured (model: %s)", GEMINI_EMBEDDING_MODEL
+        )
+        return _gemini_client
+
+    except Exception as exc:
+        _gemini_load_failed = True
+        logger.error(
+            "Failed to configure Gemini embedding client: %s. "
+            "Embedding generation will return empty vectors.",
+            exc,
+        )
+        return None
+
+
+# ── Public helpers ────────────────────────────────────────────────────────────
 
 def prepare_embedding_text(
     title: str, summary: str | None = None, content: str = ""
@@ -81,8 +112,9 @@ def prepare_embedding_text(
 def generate_embeddings(texts: list[str]) -> list[list[float]]:
     """Generate vector embeddings for a batch of texts.
 
-    Each text should ideally be constructed as:
-        title + ' ' + (summary or '') + ' ' + content[:1000]
+    Automatically selects the backend based on ENVIRONMENT:
+    - production  → Gemini API (768-dim, no local model)
+    - development → SentenceTransformer local model (384-dim)
 
     Args:
         texts: A list of text strings to embed.
@@ -94,10 +126,20 @@ def generate_embeddings(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
 
-    model = _get_model()
+    settings = get_settings()
+
+    if settings.environment == "production":
+        return _generate_gemini_embeddings(texts)
+    else:
+        return _generate_local_embeddings(texts)
+
+
+def _generate_local_embeddings(texts: list[str]) -> list[list[float]]:
+    """Generate embeddings using the local SentenceTransformer model."""
+    model = _get_local_model()
 
     if model is None:
-        logger.warning("Embedding model not available, returning empty embeddings")
+        logger.warning("Local embedding model not available, returning empty embeddings")
         return [[] for _ in texts]
 
     try:
@@ -107,11 +149,38 @@ def generate_embeddings(texts: list[str]) -> list[list[float]]:
             convert_to_numpy=True,
         )
         result: list[list[float]] = embeddings.tolist()
-        logger.debug("Generated embeddings for %d texts", len(result))
+        logger.debug("Generated %d local embeddings", len(result))
         return result
 
     except Exception as exc:
-        logger.error("Embedding generation failed: %s", exc)
+        logger.error("Local embedding generation failed: %s", exc)
+        return [[] for _ in texts]
+
+
+def _generate_gemini_embeddings(texts: list[str]) -> list[list[float]]:
+    """Generate embeddings via the Gemini API (production, zero RAM cost)."""
+    client = _get_gemini_client()
+
+    if client is None:
+        logger.warning("Gemini embedding client not available, returning empty embeddings")
+        return [[] for _ in texts]
+
+    results: list[list[float]] = []
+    try:
+        # Gemini embed_content handles one text at a time; batch sequentially
+        for text in texts:
+            response = client.embed_content(
+                model=GEMINI_EMBEDDING_MODEL,
+                content=text,
+                task_type="RETRIEVAL_DOCUMENT",
+            )
+            results.append(response["embedding"])
+
+        logger.debug("Generated %d Gemini embeddings", len(results))
+        return results
+
+    except Exception as exc:
+        logger.error("Gemini embedding generation failed: %s", exc)
         return [[] for _ in texts]
 
 
