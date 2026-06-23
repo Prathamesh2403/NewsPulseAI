@@ -92,3 +92,100 @@ async def run_ingestion_directly() -> None:
         )
     except Exception as exc:
         logger.error("[PRODUCTION INGESTION] Failed: %s", exc, exc_info=True)
+
+
+@router.post("/ingestion/sync-chroma")
+async def sync_chromadb(background_tasks: BackgroundTasks):
+    """Backfill ChromaDB with all articles currently in PostgreSQL.
+
+    Because Render Free Tier wipes local disks on every deploy, the ChromaDB
+    instance starts empty. This endpoint fetches all articles from the
+    database, generates their embeddings via the Gemini API, and inserts
+    them into ChromaDB so the AI chat can find them.
+    """
+    background_tasks.add_task(run_sync_chromadb_directly)
+    return {
+        "status": "triggered",
+        "message": "ChromaDB sync started as a background task. Check Render logs.",
+    }
+
+
+async def run_sync_chromadb_directly() -> None:
+    """Background task to sync Postgres articles to ChromaDB."""
+    from app.db.models import Article
+    from app.processing.embedder import generate_embeddings, prepare_embedding_text
+    from app.db.vector_store import get_vector_store
+
+    start = time.time()
+    logger.info("[CHROMA SYNC] Starting ChromaDB backfill from Postgres")
+
+    try:
+        # 1. Fetch all articles from PostgreSQL
+        with SyncSessionLocal() as session:
+            stmt = select(Article)
+            articles = session.scalars(stmt).all()
+
+        if not articles:
+            logger.info("[CHROMA SYNC] No articles found in Postgres.")
+            return
+
+        logger.info("[CHROMA SYNC] Found %d articles. Generating embeddings...", len(articles))
+
+        # 2. Prepare texts for embedding
+        embedding_texts = [
+            prepare_embedding_text(a.title, a.summary, a.content)
+            for a in articles
+        ]
+
+        # 3. Generate embeddings (Gemini API)
+        embeddings = generate_embeddings(embedding_texts)
+
+        # 4. Prepare ChromaDB records
+        chroma_ids = []
+        chroma_embeddings = []
+        chroma_documents = []
+        chroma_metadatas = []
+
+        for i, article in enumerate(articles):
+            # Skip if embedding generation failed for this article
+            if not embeddings[i]:
+                continue
+
+            chroma_ids.append(article.embedding_id)
+            chroma_embeddings.append(embeddings[i])
+            chroma_documents.append(embedding_texts[i][:5000])
+            chroma_metadatas.append(
+                {
+                    "category": article.category or "Other",
+                    "source": article.source or "",
+                    "source_name": article.source_name or "",
+                    "published_at": (
+                        article.published_at.isoformat()
+                        if article.published_at
+                        else ""
+                    ),
+                    "sentiment_label": article.sentiment_label or "neutral",
+                    "sentiment_score": article.sentiment_score or 0.0,
+                    "title": article.title[:500] if article.title else "",
+                    "url": article.url or "",
+                }
+            )
+
+        # 5. Upsert to ChromaDB
+        if chroma_ids:
+            vector_store = get_vector_store()
+            vector_store.upsert_articles(
+                ids=chroma_ids,
+                embeddings=chroma_embeddings,
+                documents=chroma_documents,
+                metadatas=chroma_metadatas,
+            )
+
+        elapsed = round(time.time() - start, 2)
+        logger.info(
+            "[CHROMA SYNC] Complete — %d articles synced to ChromaDB in %ss",
+            len(chroma_ids),
+            elapsed,
+        )
+    except Exception as exc:
+        logger.error("[CHROMA SYNC] Failed: %s", exc, exc_info=True)
