@@ -88,13 +88,15 @@ def create_app() -> FastAPI:
     )
 
     # CORS middleware — include Vercel frontend URL from env
+    # NOTE: .rstrip("/") is critical — browsers send Origin without a trailing
+    # slash, but the env var is often pasted with one. CORS does exact matching.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
-            "http://localhost:5173",   # Vite dev server
-            "http://localhost:4173",   # Vite preview (npm run preview)
+            "http://localhost:5173",                    # Vite dev server
+            "http://localhost:4173",                    # Vite preview (npm run preview)
             "http://localhost:3000",
-            settings.frontend_url,     # Vercel URL in production
+            settings.frontend_url.rstrip("/"),          # Vercel URL in production
         ],
         allow_credentials=True,
         allow_methods=["*"],
