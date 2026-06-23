@@ -49,22 +49,3 @@ services:
         sync: false
 
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Cron Job — Scheduled Ingestion (replaces Celery Beat in production)
-  # Runs at midnight and noon UTC every day.
-  # Uses a minimal Dockerfile.cron — just httpx + the trigger script.
-  # CMD is defined in Dockerfile.cron: python /app/cron_trigger.py
-  # ─────────────────────────────────────────────────────────────────────────────
-  - type: cron
-    name: newspulse-ingestion-cron
-    runtime: docker
-    dockerfilePath: ./Dockerfile.cron
-    schedule: "0 0,12 * * *"   # midnight and noon UTC
-    envVars:
-      # Update API_URL after the web service is deployed
-      - key: API_URL
-        value: https://newspulse-api.onrender.com
-      - key: ADMIN_USERNAME
-        sync: false
-      - key: ADMIN_PASSWORD
-        sync: false          # plain text password for login only
