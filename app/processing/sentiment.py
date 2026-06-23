@@ -26,6 +26,9 @@ def _get_pipeline() -> Any:
     Once loading fails, subsequent calls return None immediately to avoid
     repeated download/initialization attempts.
 
+    In production (Render free tier) the model is skipped entirely to stay
+    within the 512 MB RAM limit — sentiment returns neutral defaults instead.
+
     Returns:
         The transformers Pipeline instance, or None on failure.
     """
@@ -35,6 +38,16 @@ def _get_pipeline() -> Any:
         return _sentiment_pipeline
 
     if _pipeline_load_failed:
+        return None
+
+    # Skip in production to save ~250 MB RAM on Render's free tier
+    from app.core.config import get_settings
+    if get_settings().environment == "production":
+        logger.info(
+            "Production mode — sentiment analysis disabled to reduce RAM usage. "
+            "Articles will be stored with neutral sentiment defaults."
+        )
+        _pipeline_load_failed = True
         return None
 
     try:
@@ -55,6 +68,7 @@ def _get_pipeline() -> Any:
             exc,
         )
         return None
+
 
 
 def analyze_sentiment(text: str) -> tuple[str, float]:

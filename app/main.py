@@ -44,22 +44,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     setup_logging()
     logger.info("AI/Tech News Intelligence Assistant starting up ...")
-    
+
     settings = get_settings()
     if not settings.is_tavily_enabled:
-        print("WARNING: TAVILY_API_KEY not set — live search fallback disabled")
-
-    # Pre-warm the embedding model in a thread (it's CPU-bound)
-    try:
-        import asyncio
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, _prewarm_embedder)
-    except Exception as exc:
-        logger.warning("Embedding model pre-warm failed (non-fatal): %s", exc)
+        logger.warning("TAVILY_API_KEY not set — live search fallback disabled")
 
     if settings.environment == "production":
-        logger.info("Production mode — Celery/Redis skipped")
+        # Skip pre-warm in production — loading ML models (~400MB+) at startup
+        # exceeds Render free tier RAM (512MB) and blocks port binding for 5+
+        # minutes, causing Render's port scan to time out.
+        # Models load lazily on first use instead.
+        logger.info("Production mode — skipping embedder pre-warm and Celery/Redis")
     else:
+        # Pre-warm the embedding model in a thread (it's CPU-bound)
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, _prewarm_embedder)
+        except Exception as exc:
+            logger.warning("Embedding model pre-warm failed (non-fatal): %s", exc)
+
         try:
             from app.scheduler.celery_app import celery_app
             celery_app.control.ping(timeout=1)
