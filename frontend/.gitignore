@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local environment secrets — never commit
+.env
+.env.local
+
+# DO NOT ignore .env.production — it only contains the public API URL
+# and must be committed so Vite picks it up during the Vercel build.
+# .env.production

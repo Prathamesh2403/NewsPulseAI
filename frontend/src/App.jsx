@@ -1,5 +1,7 @@
 import { Routes, Route, useLocation } from 'react-router-dom'
 import Navbar from './components/common/Navbar'
+import { WakingBanner } from './components/common/WakingBanner'
+import { useApiHealth } from './hooks/useApiHealth'
 import FeedPage from './pages/FeedPage'
 import ArticleDetailPage from './pages/ArticleDetailPage'
 import ChatPage from './pages/ChatPage'
@@ -11,11 +13,12 @@ import ProtectedRoute from './components/common/ProtectedRoute'
 function App() {
   const location = useLocation()
   const isChatPage = location.pathname === '/chat'
-
   const isAuthPage = location.pathname === '/login'
+  const { isWaking } = useApiHealth()
 
   return (
     <>
+      <WakingBanner isWaking={isWaking} />
       {!isChatPage && !isAuthPage && <Navbar />}
       <main className={isChatPage ? '' : 'flex-1'}>
         <Routes>
@@ -32,3 +35,4 @@ function App() {
 }
 
 export default App
+
