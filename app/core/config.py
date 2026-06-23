@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # --- App ---
     app_env: str = "development"
     log_level: str = "INFO"
-    cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    cors_origins: str = "http://localhost:5173,http://localhost:4173,http://localhost:3000"
 
     # --- Deployment ---
     environment: str = "development"  # "development" | "production"

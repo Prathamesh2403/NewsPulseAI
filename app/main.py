@@ -91,9 +91,10 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
-            "http://localhost:5173",
+            "http://localhost:5173",   # Vite dev server
+            "http://localhost:4173",   # Vite preview (npm run preview)
             "http://localhost:3000",
-            settings.frontend_url,        # Vercel URL in production
+            settings.frontend_url,     # Vercel URL in production
         ],
         allow_credentials=True,
         allow_methods=["*"],
