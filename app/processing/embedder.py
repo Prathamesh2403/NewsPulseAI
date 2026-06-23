@@ -25,8 +25,10 @@ _local_load_failed: bool = False
 _gemini_client: Any = None
 _gemini_load_failed: bool = False
 
-GEMINI_EMBEDDING_MODEL = "models/text-embedding-004"
+GEMINI_EMBEDDING_MODEL = "gemini-embedding-001"
 GEMINI_EMBEDDING_DIM = 768
+# Gemini embed_content API hard limit: max 100 texts per batch call
+GEMINI_BATCH_SIZE = 100
 
 
 def _get_local_model() -> Any:
@@ -164,9 +166,9 @@ def _generate_local_embeddings(texts: list[str]) -> list[list[float]]:
 def _generate_gemini_embeddings(texts: list[str]) -> list[list[float]]:
     """Generate embeddings via the Gemini API (production, zero RAM cost).
 
-    Uses the new google.genai SDK which:
-    - Targets the v1 API (text-embedding-004 is available there)
-    - Supports batched embed_content calls in a single request
+    Uses the new google.genai SDK (v1 API) with gemini-embedding-001.
+    Automatically chunks input into batches of GEMINI_BATCH_SIZE (100)
+    because the API rejects requests with more than 100 texts at once.
     """
     client = _get_gemini_client()
 
@@ -177,15 +179,26 @@ def _generate_gemini_embeddings(texts: list[str]) -> list[list[float]]:
     try:
         from google.genai import types
 
-        # New SDK supports batching all texts in a single API call
-        response = client.models.embed_content(
-            model=GEMINI_EMBEDDING_MODEL,
-            contents=texts,
-            config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
-        )
-        results: list[list[float]] = [e.values for e in response.embeddings]
-        logger.debug("Generated %d Gemini embeddings", len(results))
-        return results
+        all_results: list[list[float]] = []
+
+        # Split into chunks of at most GEMINI_BATCH_SIZE to respect API limits
+        for batch_start in range(0, len(texts), GEMINI_BATCH_SIZE):
+            batch = texts[batch_start : batch_start + GEMINI_BATCH_SIZE]
+            response = client.models.embed_content(
+                model=GEMINI_EMBEDDING_MODEL,
+                contents=batch,
+                config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
+            )
+            all_results.extend(e.values for e in response.embeddings)
+            logger.debug(
+                "Embedded batch %d-%d (%d items)",
+                batch_start,
+                batch_start + len(batch) - 1,
+                len(batch),
+            )
+
+        logger.info("Generated %d Gemini embeddings total", len(all_results))
+        return all_results
 
     except Exception as exc:
         logger.error("Gemini embedding generation failed: %s", exc)
