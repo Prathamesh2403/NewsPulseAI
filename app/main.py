@@ -57,13 +57,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as exc:
         logger.warning("Embedding model pre-warm failed (non-fatal): %s", exc)
 
-    try:
-        from app.scheduler.celery_app import celery_app
-        celery_app.control.ping(timeout=1)
-        logger.info("Redis broker: connected")
-        logger.info("Current beat schedule: %s", celery_app.conf.beat_schedule)
-    except Exception:
-        logger.warning("Redis broker: NOT reachable — scheduler disabled")
+    if settings.environment == "production":
+        logger.info("Production mode — Celery/Redis skipped")
+    else:
+        try:
+            from app.scheduler.celery_app import celery_app
+            celery_app.control.ping(timeout=1)
+            logger.info("Redis broker: connected")
+            logger.info("Current beat schedule: %s", celery_app.conf.beat_schedule)
+        except Exception:
+            logger.warning("Redis broker: NOT reachable — scheduler disabled")
 
     yield
     logger.info("Application shutting down ...")
@@ -96,10 +99,14 @@ def create_app() -> FastAPI:
     # Mount all API routes
     app.include_router(api_router)
 
-    # Root health check (used by Railway healthcheckPath)
+    # Root health check (used by Render / Railway healthcheckPath)
     @app.get("/", tags=["health"])
     def root():
-        return {"status": "ok", "service": "NewsPulse AI API"}
+        return {
+            "status": "ok",
+            "service": "NewsPulse AI API",
+            "environment": settings.environment,
+        }
 
     return app
 

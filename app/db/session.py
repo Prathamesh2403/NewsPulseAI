@@ -20,12 +20,17 @@ from app.core.config import get_settings
 settings = get_settings()
 
 # Async engine for application queries
+# statement_cache_size=0 is required when connecting through Supabase's
+# pgBouncer (port 6543, transaction pooling mode) — pgBouncer does not
+# support asyncpg prepared statements; disabling the cache prevents
+# the "prepared statement does not exist" errors on repeated requests.
 engine = create_async_engine(
     settings.database_url,
     echo=settings.app_env == "development",
     pool_size=5,
     max_overflow=10,
     pool_pre_ping=True,
+    connect_args={"statement_cache_size": 0},
 )
 
 # Session factory

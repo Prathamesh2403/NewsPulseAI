@@ -18,9 +18,11 @@ COPY scripts/ ./scripts/
 COPY alembic/ ./alembic/
 COPY alembic.ini .
 
-# Create ChromaDB data directory
-# In production this path is overridden by Railway volume mount
+# Create ChromaDB data directories for both dev and production paths
+# Dev / Railway: /app/data/vector_db
+# Render persistent disk: /opt/render/project/src/data/vector_db
 RUN mkdir -p /app/data/vector_db
+RUN mkdir -p /opt/render/project/src/data/vector_db
 
 # Expose API port
 EXPOSE 8000

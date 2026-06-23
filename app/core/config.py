@@ -82,14 +82,13 @@ class Settings(BaseSettings):
 
     # --- ChromaDB ---
     # In development: ./data/chroma_db (local)
-    # In production: /app/data/vector_db (Railway volume mount)
+    # In production (Render): /opt/render/project/src/data/vector_db (persistent disk)
     chroma_persist_dir: str = "./data/chroma_db"
-    chromadb_path: str = "./data/chroma_db"  # Alias for Railway env var
+    chromadb_path: str = "./data/chroma_db"  # Overridden by CHROMADB_PATH env var
 
     @property
     def resolved_chroma_path(self) -> str:
-        """Return chromadb_path if explicitly set, else fall back to chroma_persist_dir."""
-        # If CHROMADB_PATH env var is set, it takes priority
+        """Return CHROMADB_PATH env var if explicitly overridden, else fall back to chroma_persist_dir."""
         if self.chromadb_path != "./data/chroma_db":
             return self.chromadb_path
         return self.chroma_persist_dir
