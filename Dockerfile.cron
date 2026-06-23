@@ -1,0 +1,9 @@
+# Minimal Docker image for the Render cron job.
+# Only needs httpx to call the API — no app code required.
+FROM python:3.13-slim
+
+RUN pip install --no-cache-dir httpx
+
+COPY scripts/cron_trigger.py /app/cron_trigger.py
+
+CMD ["python", "/app/cron_trigger.py"]

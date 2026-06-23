@@ -1,13 +1,12 @@
 services:
   # ─────────────────────────────────────────────────────────────────────────────
   # Web Service — FastAPI API
+  # Start command comes from Dockerfile CMD (shell form, expands $PORT).
   # ─────────────────────────────────────────────────────────────────────────────
   - type: web
     name: newspulse-api
     runtime: docker
     dockerfilePath: ./Dockerfile
-    # Shell wrapper ensures $PORT is expanded before being passed to uvicorn
-    startCommand: sh -c 'uvicorn app.main:app --host 0.0.0.0 --port $PORT'
     healthCheckPath: /
     envVars:
       - key: ENVIRONMENT
@@ -58,39 +57,14 @@ services:
   # ─────────────────────────────────────────────────────────────────────────────
   # Cron Job — Scheduled Ingestion (replaces Celery Beat in production)
   # Runs at midnight and noon UTC every day.
-  # Logs in to the API to obtain a JWT, then calls the trigger endpoint.
+  # Uses a minimal Dockerfile.cron — just httpx + the trigger script.
+  # CMD is defined in Dockerfile.cron: python /app/cron_trigger.py
   # ─────────────────────────────────────────────────────────────────────────────
   - type: cron
     name: newspulse-ingestion-cron
     runtime: docker
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./Dockerfile.cron
     schedule: "0 0,12 * * *"   # midnight and noon UTC
-    startCommand: |
-      python -c "
-      import httpx, os, sys
-
-      api_url = os.environ['API_URL'].rstrip('/')
-      username = os.environ['ADMIN_USERNAME']
-      password = os.environ['ADMIN_PASSWORD']
-
-      # Step 1: obtain JWT token
-      login_resp = httpx.post(
-          f'{api_url}/api/v1/auth/login',
-          json={'username': username, 'password': password},
-          timeout=30,
-      )
-      login_resp.raise_for_status()
-      token = login_resp.json()['access_token']
-
-      # Step 2: trigger ingestion
-      trigger_resp = httpx.post(
-          f'{api_url}/api/v1/admin/ingestion/trigger',
-          headers={'Authorization': f'Bearer {token}'},
-          timeout=30,
-      )
-      trigger_resp.raise_for_status()
-      print('Ingestion triggered successfully:', trigger_resp.json())
-      "
     envVars:
       # Update API_URL after the web service is deployed
       - key: API_URL

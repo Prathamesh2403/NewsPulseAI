@@ -27,5 +27,6 @@ RUN mkdir -p /opt/render/project/src/data/vector_db
 # Expose API port
 EXPOSE 8000
 
-# Default command (overridden per service in Railway)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Shell-form CMD so $PORT (injected by Render) is expanded at runtime.
+# Falls back to 8000 when running locally via docker-compose.
+CMD sh -c "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
