@@ -3,7 +3,6 @@
 **An AI-powered tech and AI news intelligence assistant** that aggregates content from multiple sources, analyzes sentiment and trends, and provides a grounded, citation-backed conversational interface for exploring the latest developments in AI and technology.
 
 🌐 **Live Demo**: [news-pulse-ai-rosy.vercel.app](https://news-pulse-ai-rosy.vercel.app)
-⚙️ **Backend API**: [newspulseai-lvyy.onrender.com](https://newspulseai-lvyy.onrender.com/docs)
 
 ---
 
